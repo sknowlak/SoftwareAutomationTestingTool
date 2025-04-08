@@ -358,11 +358,34 @@ const RequestEditor: React.FC<{
           {activeTab === 5 && (
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle2":
-        </Box>
-      </Box>
-    </Box>
-  );
+                <Typography variant="subtitle2">cURL Command</Typography>
+                <Tooltip title="Copy to clipboard">
+                  <IconButton size="small">
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                rows={8}
+                value="curl -X GET 'https://api.example.com'"
+                InputProps={{ readOnly: true }}
+                variant="outlined"
+                sx={{
+                  fontFamily: 'monospace',
+                  '& .MuiInputBase-input': {
+                    fontFamily: 'monospace',
+                    fontSize: '0.875rem'
+                  }
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                This cURL command represents your current request configuration.
+                You can copy it to use in terminal or share with others.
+              </Typography>
+            </Box>
+          )}
 };
 
 // Component for response viewer
