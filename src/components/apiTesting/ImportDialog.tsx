@@ -83,7 +83,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
     try {
       const request = parseCurlCommand(curlCommand);
-      
+
       if (request) {
         onImportRequest(request);
         setCurlCommand('');
@@ -104,7 +104,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
     try {
       const collection = parseSwaggerSpec(swaggerSpec);
-      
+
       if (collection) {
         onImportCollection(collection);
         setSwaggerSpec('');
@@ -135,7 +135,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       try {
         const content = e.target?.result as string;
         setSwaggerSpec(content);
-        
+
         // Auto-import if content is loaded
         const collection = parseSwaggerSpec(content);
         if (collection) {
@@ -163,19 +163,19 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Import API Request</DialogTitle>
-      
+
       <Tabs value={tabValue} onChange={handleTabChange} centered>
         <Tab label="cURL" />
         <Tab label="Swagger/OpenAPI" />
       </Tabs>
-      
+
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
-        
+
         <TabPanel value={tabValue} index={0}>
           <Typography variant="body2" gutterBottom>
             Paste a cURL command below to import it as an API request.
@@ -191,15 +191,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
             disabled={loading}
           />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Example: curl -X POST "https://api.example.com/users" -H "Content-Type: application/json" -d '{"name":"John","email":"john@example.com"}'
+            Example: curl -X POST "https://api.example.com/users" -H "Content-Type: application/json" -d "{\"name\":\"John\",\"email\":\"john@example.com\"}"
           </Typography>
         </TabPanel>
-        
+
         <TabPanel value={tabValue} index={1}>
           <Typography variant="body2" gutterBottom>
             Paste a Swagger/OpenAPI specification (JSON format) or upload a file.
           </Typography>
-          
+
           <Box sx={{ mb: 2 }}>
             <Button
               variant="outlined"
@@ -215,7 +215,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               />
             </Button>
           </Box>
-          
+
           <TextField
             fullWidth
             multiline
@@ -228,24 +228,24 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           />
         </TabPanel>
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
           Cancel
         </Button>
         {tabValue === 0 ? (
-          <Button 
-            onClick={handleImportCurl} 
-            variant="contained" 
+          <Button
+            onClick={handleImportCurl}
+            variant="contained"
             color="primary"
             disabled={!curlCommand.trim() || loading}
           >
             {loading ? <CircularProgress size={24} /> : 'Import cURL'}
           </Button>
         ) : (
-          <Button 
-            onClick={handleImportSwagger} 
-            variant="contained" 
+          <Button
+            onClick={handleImportSwagger}
+            variant="contained"
             color="primary"
             disabled={!swaggerSpec.trim() || loading}
           >
