@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -58,9 +58,19 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [curlCommand, setCurlCommand] = useState('');
+  const [debouncedCurlCommand, setDebouncedCurlCommand] = useState('');
   const [swaggerSpec, setSwaggerSpec] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Debounce curl command input to improve performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCurlCommand(curlCommand);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [curlCommand]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -77,26 +87,34 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setError(null);
   };
 
-  const handleImportCurl = () => {
+  const handleImportCurl = useCallback(() => {
+    if (!debouncedCurlCommand.trim()) {
+      setError('Please enter a cURL command');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    try {
-      const request = parseCurlCommand(curlCommand);
+    // Use setTimeout to prevent UI freezing for complex cURL commands
+    setTimeout(() => {
+      try {
+        const request = parseCurlCommand(debouncedCurlCommand);
 
-      if (request) {
-        onImportRequest(request);
-        setCurlCommand('');
-        onClose();
-      } else {
-        setError('Failed to parse cURL command. Please check the format and try again.');
+        if (request) {
+          onImportRequest(request);
+          setCurlCommand('');
+          onClose();
+        } else {
+          setError('Failed to parse cURL command. Please check the format and try again.');
+        }
+      } catch (err: any) {
+        setError(`Error parsing cURL: ${err.message}`);
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError(`Error parsing cURL: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, 0);
+  }, [debouncedCurlCommand, onImportRequest, onClose]);
 
   const handleImportSwagger = () => {
     setLoading(true);
