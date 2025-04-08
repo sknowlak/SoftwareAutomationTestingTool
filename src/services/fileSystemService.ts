@@ -532,6 +532,30 @@ export const initializeSampleData = (): void => {
   console.log('Sample data initialized successfully');
 };
 
+/**
+ * Get configuration
+ */
+export const getConfig = async (): Promise<any> => {
+  try {
+    const configPath = path.join(basePath, 'config.json');
+
+    if (fs.existsSync(configPath)) {
+      const configData = fs.readFileSync(configPath);
+      return JSON.parse(configData);
+    }
+
+    // Return default config if file doesn't exist
+    return {
+      googleApiKey: 'DEMO_API_KEY',
+      theme: 'dark',
+      notifications: true
+    };
+  } catch (error) {
+    console.error('Error getting config:', error);
+    return null;
+  }
+};
+
 export default {
   initializeFileSystem,
   getBasePath,
@@ -551,5 +575,6 @@ export default {
   getAllEnvironments,
   saveTestResult,
   getAllTestResults,
-  initializeSampleData
+  initializeSampleData,
+  getConfig
 };
