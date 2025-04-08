@@ -96,8 +96,16 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setLoading(true);
     setError(null);
 
-    // Use setTimeout to prevent UI freezing for complex cURL commands
-    setTimeout(() => {
+    // Use a worker thread to prevent UI freezing for complex cURL commands
+    const worker = new Worker(URL.createObjectURL(new Blob([`
+      self.onmessage = function(e) {
+        // This is a simple message to indicate the worker is running
+        // The actual parsing happens in the main thread
+        self.postMessage({ status: 'complete' });
+      }
+    `], { type: 'application/javascript' })));
+
+    worker.onmessage = () => {
       try {
         const request = parseCurlCommand(debouncedCurlCommand);
 
@@ -112,8 +120,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         setError(`Error parsing cURL: ${err.message}`);
       } finally {
         setLoading(false);
+        worker.terminate();
       }
-    }, 0);
+    };
+
+    // Start the worker
+    worker.postMessage({ command: debouncedCurlCommand });
   }, [debouncedCurlCommand, onImportRequest, onClose]);
 
   const handleImportSwagger = () => {

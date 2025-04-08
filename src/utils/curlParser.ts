@@ -23,8 +23,10 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
       return { ...cachedResult, id: uuidv4() };
     }
 
+    // Normalize the command - remove extra whitespace and line breaks
+    let command = curlCommand.trim().replace(/\s+/g, ' ');
+    
     // Remove 'curl' from the beginning if present
-    let command = curlCommand.trim();
     if (command.toLowerCase().startsWith('curl ')) {
       command = command.substring(5).trim();
     }
@@ -41,88 +43,62 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
       tests: []
     };
 
-    // Parse URL - optimized regex
-    let urlFound = false;
-    // First try to find URL in quotes
-    const quotedUrlMatch = /['"](https?:\/\/[^'"]+)['"]/.exec(command);
-    if (quotedUrlMatch) {
-      request.url = quotedUrlMatch[1];
-      urlFound = true;
-    }
-    
-    // If no URL found in quotes, look for unquoted URL
-    if (!urlFound) {
-      const unquotedUrlMatch = /\s(https?:\/\/[^\s]+)/.exec(command);
-      if (unquotedUrlMatch) {
-        request.url = unquotedUrlMatch[1];
-        urlFound = true;
-      }
-    }
-    
-    // Last resort - try to find any URL-like string
-    if (!urlFound) {
-      const urlLikeMatch = /\s([^-][^\s]+\.[^\s]+)/.exec(command);
-      if (urlLikeMatch) {
-        request.url = urlLikeMatch[1];
-        // Add http if missing
-        if (!request.url.startsWith('http')) {
-          request.url = 'https://' + request.url;
-        }
-      }
-    }
+    // Extract all parts of the command
+    const parts = splitCommandIntoParts(command);
 
-    // Extract query parameters from URL if present
-    if (request.url && request.url.includes('?')) {
+    // Process URL
+    const url = extractUrl(parts);
+    if (url) {
+      request.url = url;
+      
+      // Extract query parameters from URL if present
       try {
-        const urlObj = new URL(request.url);
-        urlObj.searchParams.forEach((value, key) => {
-          request.params.push({ key, value });
-        });
-        
-        // Remove query parameters from URL for cleaner display
-        request.url = request.url.split('?')[0];
+        if (request.url.includes('?')) {
+          const urlObj = new URL(request.url);
+          urlObj.searchParams.forEach((value, key) => {
+            request.params.push({ key, value });
+          });
+          
+          // Remove query parameters from URL for cleaner display
+          request.url = request.url.split('?')[0];
+        }
       } catch (e) {
         // URL parsing failed, keep URL as is
+        console.warn('Failed to parse URL query parameters:', e);
       }
     }
 
-    // Parse method - optimized regex
-    const methodMatch = /(?:-X|--request)\s+([A-Za-z]+)/.exec(command);
-    if (methodMatch) {
-      request.method = methodMatch[1].toUpperCase();
+    // Process method
+    const method = extractMethod(parts);
+    if (method) {
+      request.method = method;
     }
 
-    // Parse headers - optimized to use a more efficient regex
-    const headerRegex = /-H\s+['"]([^:]+):\s*([^'"]+)['"]|--header\s+['"]([^:]+):\s*([^'"]+)['"]/g;
-    let headerMatch;
-    while ((headerMatch = headerRegex.exec(command)) !== null) {
-      const key = headerMatch[1] || headerMatch[3];
-      const value = headerMatch[2] || headerMatch[4];
-      if (key && value) {
-        request.headers.push({
-          key: key.trim(),
-          value: value.trim()
-        });
-      }
+    // Process headers
+    const headers = extractHeaders(parts);
+    if (headers.length > 0) {
+      request.headers = headers;
     }
 
-    // Parse data/body - optimized regex
-    const dataMatch = /(?:--data|-d)\s+['"](.+?)['"](?:\s|$)/.exec(command);
-    if (dataMatch) {
-      request.body = dataMatch[1];
+    // Process data/body
+    const body = extractBody(parts);
+    if (body) {
+      request.body = body;
       
-      // If method is not specified but data is present, assume POST
-      if (request.method === 'GET') {
+      // If method is not specified explicitly but data is present, assume POST
+      if (request.method === 'GET' && !method) {
         request.method = 'POST';
       }
-      
-      // Try to parse as JSON for better formatting
-      try {
-        const jsonBody = JSON.parse(request.body);
-        request.body = JSON.stringify(jsonBody, null, 2);
-      } catch (e) {
-        // Not valid JSON, keep as is
-      }
+    }
+
+    // Process content type
+    const contentType = extractContentType(request.headers);
+    if (contentType) {
+      // Format body based on content type
+      formatBodyByContentType(request, contentType);
+    } else if (request.body) {
+      // Try to detect and format JSON body
+      tryFormatJsonBody(request);
     }
 
     // Set a more descriptive name based on the URL
@@ -145,6 +121,12 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
       }
     }
 
+    // Add a basic test for successful response
+    request.tests.push({
+      name: 'Status code is 2xx',
+      script: 'pm.test("Status code is 2xx", function() { pm.response.to.be.success; });'
+    });
+
     // Cache the result for future use (limit cache size to 100 entries)
     if (curlCache.size >= 100) {
       // Remove the oldest entry
@@ -159,6 +141,252 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
     return null;
   }
 };
+
+/**
+ * Split a cURL command into parts for easier processing
+ */
+function splitCommandIntoParts(command: string): string[] {
+  const parts: string[] = [];
+  let currentPart = '';
+  let inQuotes = false;
+  let quoteChar = '';
+  
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    
+    // Handle quotes
+    if ((char === '"' || char === "'") && (i === 0 || command[i-1] !== '\\')) {
+      if (!inQuotes) {
+        inQuotes = true;
+        quoteChar = char;
+      } else if (char === quoteChar) {
+        inQuotes = false;
+      }
+    }
+    
+    // Handle spaces (only split on spaces outside of quotes)
+    if (char === ' ' && !inQuotes) {
+      if (currentPart) {
+        parts.push(currentPart);
+        currentPart = '';
+      }
+    } else {
+      currentPart += char;
+    }
+  }
+  
+  // Add the last part
+  if (currentPart) {
+    parts.push(currentPart);
+  }
+  
+  return parts;
+}
+
+/**
+ * Extract URL from command parts
+ */
+function extractUrl(parts: string[]): string | null {
+  // First look for URL after -X METHOD or --request METHOD
+  for (let i = 0; i < parts.length - 1; i++) {
+    if ((parts[i] === '-X' || parts[i] === '--request') && i + 2 < parts.length) {
+      const potentialUrl = parts[i + 2];
+      if (isUrl(potentialUrl)) {
+        return cleanUrl(potentialUrl);
+      }
+    }
+  }
+  
+  // Then look for any URL in the parts
+  for (const part of parts) {
+    if (isUrl(part)) {
+      return cleanUrl(part);
+    }
+  }
+  
+  // Last resort: look for anything that might be a URL
+  for (const part of parts) {
+    if (part.includes('.') && !part.startsWith('-')) {
+      const url = cleanUrl(part);
+      return url.startsWith('http') ? url : `https://${url}`;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Check if a string is a URL
+ */
+function isUrl(str: string): boolean {
+  return str.startsWith('http://') || 
+         str.startsWith('https://') || 
+         str.startsWith('www.') ||
+         /^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+/.test(str);
+}
+
+/**
+ * Clean a URL string (remove quotes, etc.)
+ */
+function cleanUrl(url: string): string {
+  return url.replace(/^['"]|['"]$/g, '');
+}
+
+/**
+ * Extract HTTP method from command parts
+ */
+function extractMethod(parts: string[]): string | null {
+  const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+  
+  // Look for -X or --request followed by a method
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (parts[i] === '-X' || parts[i] === '--request') {
+      const method = parts[i + 1].toUpperCase().replace(/['"]/g, '');
+      if (validMethods.includes(method)) {
+        return method;
+      }
+    }
+  }
+  
+  // Check for shorthand methods like -XPOST
+  for (const part of parts) {
+    if (part.startsWith('-X') && part.length > 2) {
+      const method = part.substring(2).toUpperCase();
+      if (validMethods.includes(method)) {
+        return method;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extract headers from command parts
+ */
+function extractHeaders(parts: string[]): KeyValuePair[] {
+  const headers: KeyValuePair[] = [];
+  
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (parts[i] === '-H' || parts[i] === '--header') {
+      const headerStr = parts[i + 1].replace(/^['"]|['"]$/g, '');
+      const colonIndex = headerStr.indexOf(':');
+      
+      if (colonIndex > 0) {
+        const key = headerStr.substring(0, colonIndex).trim();
+        const value = headerStr.substring(colonIndex + 1).trim();
+        headers.push({ key, value });
+      }
+    }
+  }
+  
+  return headers;
+}
+
+/**
+ * Extract body data from command parts
+ */
+function extractBody(parts: string[]): string | null {
+  // Check for --data, -d, --data-binary, --data-raw, --data-ascii, --data-urlencode
+  const dataFlags = ['--data', '-d', '--data-binary', '--data-raw', '--data-ascii', '--data-urlencode'];
+  
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (dataFlags.includes(parts[i])) {
+      return parts[i + 1].replace(/^['"]|['"]$/g, '');
+    }
+    
+    // Handle --data=value format
+    for (const flag of dataFlags) {
+      if (parts[i].startsWith(`${flag}=`)) {
+        return parts[i].substring(flag.length + 1).replace(/^['"]|['"]$/g, '');
+      }
+    }
+  }
+  
+  // Check for form data
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (parts[i] === '-F' || parts[i] === '--form') {
+      const formData: Record<string, string> = {};
+      
+      // Collect all form fields
+      for (let j = i; j < parts.length - 1; j += 2) {
+        if (parts[j] === '-F' || parts[j] === '--form') {
+          const formField = parts[j + 1].replace(/^['"]|['"]$/g, '');
+          const equalsIndex = formField.indexOf('=');
+          
+          if (equalsIndex > 0) {
+            const key = formField.substring(0, equalsIndex).trim();
+            const value = formField.substring(equalsIndex + 1).trim();
+            formData[key] = value;
+          }
+        }
+      }
+      
+      // Convert to JSON
+      return JSON.stringify(formData);
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extract content type from headers
+ */
+function extractContentType(headers: KeyValuePair[]): string | null {
+  for (const header of headers) {
+    if (header.key.toLowerCase() === 'content-type') {
+      return header.value;
+    }
+  }
+  return null;
+}
+
+/**
+ * Format body based on content type
+ */
+function formatBodyByContentType(request: ApiRequest, contentType: string): void {
+  if (contentType.includes('application/json')) {
+    tryFormatJsonBody(request);
+  } else if (contentType.includes('application/x-www-form-urlencoded')) {
+    // Convert URL encoded form data to JSON for better display
+    try {
+      const formData: Record<string, string> = {};
+      const params = new URLSearchParams(request.body);
+      
+      params.forEach((value, key) => {
+        formData[key] = value;
+      });
+      
+      request.body = JSON.stringify(formData, null, 2);
+    } catch (e) {
+      // Keep as is if parsing fails
+    }
+  }
+}
+
+/**
+ * Try to format body as JSON
+ */
+function tryFormatJsonBody(request: ApiRequest): void {
+  if (!request.body) return;
+  
+  try {
+    // Check if it's already valid JSON
+    const jsonBody = JSON.parse(request.body);
+    request.body = JSON.stringify(jsonBody, null, 2);
+  } catch (e) {
+    // Try to handle escaped JSON
+    try {
+      // Replace escaped quotes
+      const unescaped = request.body.replace(/\\"/g, '"');
+      const jsonBody = JSON.parse(unescaped);
+      request.body = JSON.stringify(jsonBody, null, 2);
+    } catch (e2) {
+      // Not valid JSON, keep as is
+    }
+  }
+}
 
 /**
  * Convert an ApiRequest object to a cURL command
@@ -195,7 +423,15 @@ export const convertToCurl = (request: ApiRequest): string => {
   
   // Add body if present
   if (request.body) {
-    curl += ` -d '${request.body}'`;
+    // Check if body is JSON
+    try {
+      JSON.parse(request.body);
+      // If it's JSON, use double quotes for the body
+      curl += ` -d "${request.body.replace(/"/g, '\\"')}"`;
+    } catch (e) {
+      // Not JSON, use single quotes
+      curl += ` -d '${request.body}'`;
+    }
   }
   
   return curl;
