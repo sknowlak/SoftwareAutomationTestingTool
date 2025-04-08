@@ -269,6 +269,7 @@ const RequestEditor: React.FC<{
           <Tab label="Tests" />
           <Tab label="Pre-request Script" />
           <Tab label="cURL" />
+        </Tabs>
 
         <Box sx={{ p: 2, border: 1, borderColor: 'divider', borderTop: 0 }}>
           {activeTab === 0 && (
