@@ -8,9 +8,7 @@ import './index.css'
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      {/* Temporarily using SimpleApp for testing */}
-      <SimpleApp />
-      {/* <App /> */}
+      <App />
     </BrowserRouter>
   </React.StrictMode>,
 )
