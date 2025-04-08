@@ -6,52 +6,82 @@ import { TestCase, TestSuite, TestStatus, TestSeverity, TestPriority } from './t
 import { ApiRequest, ApiResponse, ApiCollection, ApiEnvironment } from '../types/apiTypes';
 
 // Node.js modules for file system operations
-// Note: In a real app, these would be used directly
-// For this demo, we'll simulate file system operations
+// Note: In a real app, these would use actual file system APIs
+// For this demo, we'll use localStorage with error handling
 const fs = {
   existsSync: (path: string): boolean => {
-    // Simulate checking if a file/directory exists
-    const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
-    const registry = JSON.parse(storedData);
-    return !!registry[path];
-  },
-  
-  mkdirSync: (path: string, options?: any): void => {
-    // Simulate creating a directory
-    const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
-    const registry = JSON.parse(storedData);
-    registry[path] = { type: 'directory', created: new Date().toISOString() };
-    localStorage.setItem('betaboss_fs_registry', JSON.stringify(registry));
-  },
-  
-  writeFileSync: (path: string, data: string, options?: any): void => {
-    // Simulate writing to a file
-    const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
-    const registry = JSON.parse(storedData);
-    registry[path] = { type: 'file', created: new Date().toISOString(), modified: new Date().toISOString() };
-    localStorage.setItem('betaboss_fs_registry', JSON.stringify(registry));
-    localStorage.setItem(`betaboss_fs_${path}`, data);
-  },
-  
-  readFileSync: (path: string, options?: any): string => {
-    // Simulate reading from a file
-    return localStorage.getItem(`betaboss_fs_${path}`) || '';
-  },
-  
-  readdirSync: (path: string, options?: any): string[] => {
-    // Simulate reading directory contents
-    const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
-    const registry = JSON.parse(storedData);
-    const result: string[] = [];
-    
-    // Find all entries that are direct children of the path
-    for (const key in registry) {
-      if (key !== path && key.startsWith(path) && !key.slice(path.length + 1).includes('/')) {
-        result.push(key.slice(path.length + 1));
-      }
+    try {
+      // Simulate checking if a file/directory exists
+      const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
+      const registry = JSON.parse(storedData);
+      return !!registry[path];
+    } catch (error) {
+      console.error(`Error checking if path exists: ${path}`, error);
+      return false;
     }
-    
-    return result;
+  },
+
+  mkdirSync: (path: string, options?: any): void => {
+    try {
+      // Simulate creating a directory
+      const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
+      const registry = JSON.parse(storedData);
+      registry[path] = { type: 'directory', created: new Date().toISOString() };
+      localStorage.setItem('betaboss_fs_registry', JSON.stringify(registry));
+      console.log(`Created directory: ${path}`);
+    } catch (error) {
+      console.error(`Error creating directory: ${path}`, error);
+    }
+  },
+
+  writeFileSync: (path: string, data: string, options?: any): void => {
+    try {
+      // Simulate writing to a file
+      const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
+      const registry = JSON.parse(storedData);
+      registry[path] = { type: 'file', created: new Date().toISOString(), modified: new Date().toISOString() };
+      localStorage.setItem('betaboss_fs_registry', JSON.stringify(registry));
+      localStorage.setItem(`betaboss_fs_${path}`, data);
+      console.log(`Wrote to file: ${path}`);
+    } catch (error) {
+      console.error(`Error writing to file: ${path}`, error);
+    }
+  },
+
+  readFileSync: (path: string, options?: any): string => {
+    try {
+      // Simulate reading from a file
+      const data = localStorage.getItem(`betaboss_fs_${path}`);
+      if (data === null) {
+        console.warn(`File not found: ${path}`);
+        return '';
+      }
+      return data;
+    } catch (error) {
+      console.error(`Error reading file: ${path}`, error);
+      return '';
+    }
+  },
+
+  readdirSync: (path: string, options?: any): string[] => {
+    try {
+      // Simulate reading directory contents
+      const storedData = localStorage.getItem('betaboss_fs_registry') || '{}';
+      const registry = JSON.parse(storedData);
+      const result: string[] = [];
+
+      // Find all entries that are direct children of the path
+      for (const key in registry) {
+        if (key !== path && key.startsWith(path) && !key.slice(path.length + 1).includes('/')) {
+          result.push(key.slice(path.length + 1));
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`Error reading directory: ${path}`, error);
+      return [];
+    }
   }
 };
 
@@ -61,7 +91,7 @@ const path = {
     // Simulate path joining
     return paths.join('/').replace(/\/+/g, '/');
   },
-  
+
   dirname: (path: string): string => {
     // Simulate getting directory name
     return path.split('/').slice(0, -1).join('/');
@@ -76,36 +106,48 @@ let basePath = 'C:/Betaboss';
  * @param customPath Custom path for Betaboss data
  */
 export const initializeFileSystem = (customPath?: string): void => {
-  if (customPath) {
-    basePath = customPath;
-  }
-  
-  // Create base directory if it doesn't exist
-  if (!fs.existsSync(basePath)) {
-    fs.mkdirSync(basePath);
-  }
-  
-  // Create subdirectories
-  const directories = [
-    'TestCases',
-    'TestSuites',
-    'TestResults',
-    'ApiCollections',
-    'Environments',
-    'Reports'
-  ];
-  
-  directories.forEach(dir => {
-    const dirPath = path.join(basePath, dir);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath);
+  try {
+    if (customPath) {
+      basePath = customPath;
     }
-  });
-  
-  // Save base path to localStorage for persistence
-  localStorage.setItem('betaboss_base_path', basePath);
-  
-  console.log(`File system initialized at ${basePath}`);
+
+    console.log(`Initializing file system at ${basePath}`);
+
+    // Create base directory if it doesn't exist
+    if (!fs.existsSync(basePath)) {
+      fs.mkdirSync(basePath);
+      console.log(`Created base directory: ${basePath}`);
+    }
+
+    // Create subdirectories
+    const directories = [
+      'TestCases',
+      'TestSuites',
+      'TestResults',
+      'ApiCollections',
+      'Environments',
+      'Reports',
+      'module' // Added module subfolder as requested
+    ];
+
+    directories.forEach(dir => {
+      const dirPath = path.join(basePath, dir);
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath);
+        console.log(`Created directory: ${dirPath}`);
+      }
+    });
+
+    // Save base path to localStorage for persistence
+    localStorage.setItem('betaboss_base_path', basePath);
+
+    console.log(`File system initialized successfully at ${basePath}`);
+  } catch (error) {
+    console.error('Error initializing file system:', error);
+    // Use default path as fallback
+    basePath = 'C:/Betaboss';
+    localStorage.setItem('betaboss_base_path', basePath);
+  }
 };
 
 /**
@@ -144,12 +186,12 @@ export const saveTestCase = (testCase: TestCase): void => {
  */
 export const getTestCase = (id: string): TestCase | null => {
   const filePath = path.join(basePath, 'TestCases', `${id}.json`);
-  
+
   if (fs.existsSync(filePath)) {
     const data = fs.readFileSync(filePath);
     return JSON.parse(data);
   }
-  
+
   return null;
 };
 
@@ -158,14 +200,14 @@ export const getTestCase = (id: string): TestCase | null => {
  */
 export const getAllTestCases = (): TestCase[] => {
   const dirPath = path.join(basePath, 'TestCases');
-  
+
   if (!fs.existsSync(dirPath)) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dirPath);
   const testCases: TestCase[] = [];
-  
+
   files.forEach(file => {
     if (file.endsWith('.json')) {
       const filePath = path.join(dirPath, file);
@@ -173,7 +215,7 @@ export const getAllTestCases = (): TestCase[] => {
       testCases.push(JSON.parse(data));
     }
   });
-  
+
   return testCases;
 };
 
@@ -190,12 +232,12 @@ export const saveTestSuite = (testSuite: TestSuite): void => {
  */
 export const getTestSuite = (id: string): TestSuite | null => {
   const filePath = path.join(basePath, 'TestSuites', `${id}.json`);
-  
+
   if (fs.existsSync(filePath)) {
     const data = fs.readFileSync(filePath);
     return JSON.parse(data);
   }
-  
+
   return null;
 };
 
@@ -204,14 +246,14 @@ export const getTestSuite = (id: string): TestSuite | null => {
  */
 export const getAllTestSuites = (): TestSuite[] => {
   const dirPath = path.join(basePath, 'TestSuites');
-  
+
   if (!fs.existsSync(dirPath)) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dirPath);
   const testSuites: TestSuite[] = [];
-  
+
   files.forEach(file => {
     if (file.endsWith('.json')) {
       const filePath = path.join(dirPath, file);
@@ -219,7 +261,7 @@ export const getAllTestSuites = (): TestSuite[] => {
       testSuites.push(JSON.parse(data));
     }
   });
-  
+
   return testSuites;
 };
 
@@ -236,12 +278,12 @@ export const saveApiCollection = (collection: ApiCollection): void => {
  */
 export const getApiCollection = (id: string): ApiCollection | null => {
   const filePath = path.join(basePath, 'ApiCollections', `${id}.json`);
-  
+
   if (fs.existsSync(filePath)) {
     const data = fs.readFileSync(filePath);
     return JSON.parse(data);
   }
-  
+
   return null;
 };
 
@@ -250,14 +292,14 @@ export const getApiCollection = (id: string): ApiCollection | null => {
  */
 export const getAllApiCollections = (): ApiCollection[] => {
   const dirPath = path.join(basePath, 'ApiCollections');
-  
+
   if (!fs.existsSync(dirPath)) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dirPath);
   const collections: ApiCollection[] = [];
-  
+
   files.forEach(file => {
     if (file.endsWith('.json')) {
       const filePath = path.join(dirPath, file);
@@ -265,7 +307,7 @@ export const getAllApiCollections = (): ApiCollection[] => {
       collections.push(JSON.parse(data));
     }
   });
-  
+
   return collections;
 };
 
@@ -282,12 +324,12 @@ export const saveEnvironment = (environment: ApiEnvironment): void => {
  */
 export const getEnvironment = (id: string): ApiEnvironment | null => {
   const filePath = path.join(basePath, 'Environments', `${id}.json`);
-  
+
   if (fs.existsSync(filePath)) {
     const data = fs.readFileSync(filePath);
     return JSON.parse(data);
   }
-  
+
   return null;
 };
 
@@ -296,14 +338,14 @@ export const getEnvironment = (id: string): ApiEnvironment | null => {
  */
 export const getAllEnvironments = (): ApiEnvironment[] => {
   const dirPath = path.join(basePath, 'Environments');
-  
+
   if (!fs.existsSync(dirPath)) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dirPath);
   const environments: ApiEnvironment[] = [];
-  
+
   files.forEach(file => {
     if (file.endsWith('.json')) {
       const filePath = path.join(dirPath, file);
@@ -311,7 +353,7 @@ export const getAllEnvironments = (): ApiEnvironment[] => {
       environments.push(JSON.parse(data));
     }
   });
-  
+
   return environments;
 };
 
@@ -328,14 +370,14 @@ export const saveTestResult = (testResult: any): void => {
  */
 export const getAllTestResults = (): any[] => {
   const dirPath = path.join(basePath, 'TestResults');
-  
+
   if (!fs.existsSync(dirPath)) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dirPath);
   const results: any[] = [];
-  
+
   files.forEach(file => {
     if (file.endsWith('.json')) {
       const filePath = path.join(dirPath, file);
@@ -343,7 +385,7 @@ export const getAllTestResults = (): any[] => {
       results.push(JSON.parse(data));
     }
   });
-  
+
   return results;
 };
 
@@ -388,12 +430,12 @@ export const initializeSampleData = (): void => {
       ]
     }
   ];
-  
+
   // Save sample test cases
   sampleTestCases.forEach(testCase => {
     saveTestCase(testCase);
   });
-  
+
   // Sample test suites
   const sampleTestSuites: TestSuite[] = [
     {
@@ -404,12 +446,12 @@ export const initializeSampleData = (): void => {
       executionTime: 2150
     }
   ];
-  
+
   // Save sample test suites
   sampleTestSuites.forEach(testSuite => {
     saveTestSuite(testSuite);
   });
-  
+
   // Sample API collections
   const sampleApiCollections: ApiCollection[] = [
     {
@@ -456,12 +498,12 @@ export const initializeSampleData = (): void => {
       ]
     }
   ];
-  
+
   // Save sample API collections
   sampleApiCollections.forEach(collection => {
     saveApiCollection(collection);
   });
-  
+
   // Sample environments
   const sampleEnvironments: ApiEnvironment[] = [
     {
@@ -481,12 +523,12 @@ export const initializeSampleData = (): void => {
       ]
     }
   ];
-  
+
   // Save sample environments
   sampleEnvironments.forEach(environment => {
     saveEnvironment(environment);
   });
-  
+
   console.log('Sample data initialized successfully');
 };
 
