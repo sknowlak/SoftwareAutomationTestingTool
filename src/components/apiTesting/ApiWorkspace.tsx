@@ -386,6 +386,10 @@ const RequestEditor: React.FC<{
               </Typography>
             </Box>
           )}
+        </Box>
+      </Box>
+    </Box>
+  );
 };
 
 // Component for response viewer
