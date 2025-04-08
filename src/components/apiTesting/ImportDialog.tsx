@@ -191,7 +191,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
             disabled={loading}
           />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            {`Example: curl -X POST "https://api.example.com/users" -H "Content-Type: application/json" -d '{"name":"John"}'`}
+            Example: curl -X POST "https://api.example.com/users" -H "Content-Type: application/json" -d '{"name":"John"}'
           </Typography>
         </TabPanel>
 
