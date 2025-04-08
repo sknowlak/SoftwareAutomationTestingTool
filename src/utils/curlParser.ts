@@ -23,9 +23,27 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
       return { ...cachedResult, id: uuidv4() };
     }
 
+    // Handle the case where the input is just a URL
+    if (isSimpleUrl(curlCommand.trim())) {
+      const request: ApiRequest = {
+        id: uuidv4(),
+        name: 'GET ' + getUrlLastSegment(curlCommand.trim()),
+        url: curlCommand.trim(),
+        method: 'GET',
+        headers: [],
+        params: [],
+        body: '',
+        tests: []
+      };
+
+      // Cache the result
+      curlCache.set(curlCommand, { ...request });
+      return request;
+    }
+
     // Normalize the command - remove extra whitespace and line breaks
     let command = curlCommand.trim().replace(/\s+/g, ' ');
-    
+
     // Remove 'curl' from the beginning if present
     if (command.toLowerCase().startsWith('curl ')) {
       command = command.substring(5).trim();
@@ -43,6 +61,16 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
       tests: []
     };
 
+    // Handle the case where the command is just a URL
+    if (isSimpleUrl(command)) {
+      request.url = command;
+      request.name = 'GET ' + getUrlLastSegment(command);
+
+      // Cache the result
+      curlCache.set(curlCommand, { ...request });
+      return request;
+    }
+
     // Extract all parts of the command
     const parts = splitCommandIntoParts(command);
 
@@ -50,7 +78,7 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
     const url = extractUrl(parts);
     if (url) {
       request.url = url;
-      
+
       // Extract query parameters from URL if present
       try {
         if (request.url.includes('?')) {
@@ -58,7 +86,7 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
           urlObj.searchParams.forEach((value, key) => {
             request.params.push({ key, value });
           });
-          
+
           // Remove query parameters from URL for cleaner display
           request.url = request.url.split('?')[0];
         }
@@ -84,7 +112,7 @@ export const parseCurlCommand = (curlCommand: string): ApiRequest | null => {
     const body = extractBody(parts);
     if (body) {
       request.body = body;
-      
+
       // If method is not specified explicitly but data is present, assume POST
       if (request.method === 'GET' && !method) {
         request.method = 'POST';
@@ -150,10 +178,10 @@ function splitCommandIntoParts(command: string): string[] {
   let currentPart = '';
   let inQuotes = false;
   let quoteChar = '';
-  
+
   for (let i = 0; i < command.length; i++) {
     const char = command[i];
-    
+
     // Handle quotes
     if ((char === '"' || char === "'") && (i === 0 || command[i-1] !== '\\')) {
       if (!inQuotes) {
@@ -163,7 +191,7 @@ function splitCommandIntoParts(command: string): string[] {
         inQuotes = false;
       }
     }
-    
+
     // Handle spaces (only split on spaces outside of quotes)
     if (char === ' ' && !inQuotes) {
       if (currentPart) {
@@ -174,12 +202,12 @@ function splitCommandIntoParts(command: string): string[] {
       currentPart += char;
     }
   }
-  
+
   // Add the last part
   if (currentPart) {
     parts.push(currentPart);
   }
-  
+
   return parts;
 }
 
@@ -196,14 +224,14 @@ function extractUrl(parts: string[]): string | null {
       }
     }
   }
-  
+
   // Then look for any URL in the parts
   for (const part of parts) {
     if (isUrl(part)) {
       return cleanUrl(part);
     }
   }
-  
+
   // Last resort: look for anything that might be a URL
   for (const part of parts) {
     if (part.includes('.') && !part.startsWith('-')) {
@@ -211,7 +239,7 @@ function extractUrl(parts: string[]): string | null {
       return url.startsWith('http') ? url : `https://${url}`;
     }
   }
-  
+
   return null;
 }
 
@@ -219,10 +247,57 @@ function extractUrl(parts: string[]): string | null {
  * Check if a string is a URL
  */
 function isUrl(str: string): boolean {
-  return str.startsWith('http://') || 
-         str.startsWith('https://') || 
+  return str.startsWith('http://') ||
+         str.startsWith('https://') ||
          str.startsWith('www.') ||
          /^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+/.test(str);
+}
+
+/**
+ * Check if a string is a simple URL (just a URL without any cURL parameters)
+ */
+function isSimpleUrl(str: string): boolean {
+  // Check if it's a valid URL format
+  try {
+    new URL(str);
+    return true;
+  } catch (e) {
+    // If it doesn't have a protocol, try adding https://
+    if (!str.startsWith('http://') && !str.startsWith('https://')) {
+      try {
+        new URL('https://' + str);
+        return true;
+      } catch (e2) {
+        return false;
+      }
+    }
+    return false;
+  }
+}
+
+/**
+ * Get the last segment of a URL for naming purposes
+ */
+function getUrlLastSegment(url: string): string {
+  try {
+    let urlStr = url;
+    if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+      urlStr = 'https://' + urlStr;
+    }
+
+    const urlObj = new URL(urlStr);
+    const pathParts = urlObj.pathname.split('/').filter(Boolean);
+
+    if (pathParts.length > 0) {
+      return pathParts[pathParts.length - 1];
+    } else {
+      return urlObj.hostname;
+    }
+  } catch (e) {
+    // If URL parsing fails, just return the last part of the string
+    const parts = url.split('/');
+    return parts[parts.length - 1] || url;
+  }
 }
 
 /**
@@ -237,7 +312,7 @@ function cleanUrl(url: string): string {
  */
 function extractMethod(parts: string[]): string | null {
   const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
-  
+
   // Look for -X or --request followed by a method
   for (let i = 0; i < parts.length - 1; i++) {
     if (parts[i] === '-X' || parts[i] === '--request') {
@@ -247,7 +322,7 @@ function extractMethod(parts: string[]): string | null {
       }
     }
   }
-  
+
   // Check for shorthand methods like -XPOST
   for (const part of parts) {
     if (part.startsWith('-X') && part.length > 2) {
@@ -257,7 +332,7 @@ function extractMethod(parts: string[]): string | null {
       }
     }
   }
-  
+
   return null;
 }
 
@@ -266,12 +341,12 @@ function extractMethod(parts: string[]): string | null {
  */
 function extractHeaders(parts: string[]): KeyValuePair[] {
   const headers: KeyValuePair[] = [];
-  
+
   for (let i = 0; i < parts.length - 1; i++) {
     if (parts[i] === '-H' || parts[i] === '--header') {
       const headerStr = parts[i + 1].replace(/^['"]|['"]$/g, '');
       const colonIndex = headerStr.indexOf(':');
-      
+
       if (colonIndex > 0) {
         const key = headerStr.substring(0, colonIndex).trim();
         const value = headerStr.substring(colonIndex + 1).trim();
@@ -279,7 +354,7 @@ function extractHeaders(parts: string[]): KeyValuePair[] {
       }
     }
   }
-  
+
   return headers;
 }
 
@@ -289,12 +364,12 @@ function extractHeaders(parts: string[]): KeyValuePair[] {
 function extractBody(parts: string[]): string | null {
   // Check for --data, -d, --data-binary, --data-raw, --data-ascii, --data-urlencode
   const dataFlags = ['--data', '-d', '--data-binary', '--data-raw', '--data-ascii', '--data-urlencode'];
-  
+
   for (let i = 0; i < parts.length - 1; i++) {
     if (dataFlags.includes(parts[i])) {
       return parts[i + 1].replace(/^['"]|['"]$/g, '');
     }
-    
+
     // Handle --data=value format
     for (const flag of dataFlags) {
       if (parts[i].startsWith(`${flag}=`)) {
@@ -302,18 +377,18 @@ function extractBody(parts: string[]): string | null {
       }
     }
   }
-  
+
   // Check for form data
   for (let i = 0; i < parts.length - 1; i++) {
     if (parts[i] === '-F' || parts[i] === '--form') {
       const formData: Record<string, string> = {};
-      
+
       // Collect all form fields
       for (let j = i; j < parts.length - 1; j += 2) {
         if (parts[j] === '-F' || parts[j] === '--form') {
           const formField = parts[j + 1].replace(/^['"]|['"]$/g, '');
           const equalsIndex = formField.indexOf('=');
-          
+
           if (equalsIndex > 0) {
             const key = formField.substring(0, equalsIndex).trim();
             const value = formField.substring(equalsIndex + 1).trim();
@@ -321,12 +396,12 @@ function extractBody(parts: string[]): string | null {
           }
         }
       }
-      
+
       // Convert to JSON
       return JSON.stringify(formData);
     }
   }
-  
+
   return null;
 }
 
@@ -353,11 +428,11 @@ function formatBodyByContentType(request: ApiRequest, contentType: string): void
     try {
       const formData: Record<string, string> = {};
       const params = new URLSearchParams(request.body);
-      
+
       params.forEach((value, key) => {
         formData[key] = value;
       });
-      
+
       request.body = JSON.stringify(formData, null, 2);
     } catch (e) {
       // Keep as is if parsing fails
@@ -370,7 +445,7 @@ function formatBodyByContentType(request: ApiRequest, contentType: string): void
  */
 function tryFormatJsonBody(request: ApiRequest): void {
   if (!request.body) return;
-  
+
   try {
     // Check if it's already valid JSON
     const jsonBody = JSON.parse(request.body);
@@ -395,7 +470,7 @@ function tryFormatJsonBody(request: ApiRequest): void {
  */
 export const convertToCurl = (request: ApiRequest): string => {
   let curl = `curl -X ${request.method}`;
-  
+
   // Add URL with query parameters
   let url = request.url;
   if (request.params.length > 0) {
@@ -413,14 +488,14 @@ export const convertToCurl = (request: ApiRequest): string => {
     }
   }
   curl += ` "${url}"`;
-  
+
   // Add headers
   request.headers.forEach(header => {
     if (header.enabled !== false) {
       curl += ` -H "${header.key}: ${header.value}"`;
     }
   });
-  
+
   // Add body if present
   if (request.body) {
     // Check if body is JSON
@@ -433,7 +508,7 @@ export const convertToCurl = (request: ApiRequest): string => {
       curl += ` -d '${request.body}'`;
     }
   }
-  
+
   return curl;
 };
 
