@@ -947,7 +947,10 @@ const ApiWorkspace: React.FC = () => {
                               color: REQUEST_METHODS.find(m => m.method === request.method)?.color
                             }} />
                           </ListItemIcon>
-                          <ListItemText primary={request.name} />
+                          <ListItemText
+                            primary={decodeURIComponent(request.name)}
+                            secondary={request.method + ' ' + (request.url.length > 20 ? request.url.substring(0, 20) + '...' : request.url)}
+                          />
                           <IconButton
                             size="small"
                             onClick={(e) => handleRequestMenuOpen(e, request.id)}
