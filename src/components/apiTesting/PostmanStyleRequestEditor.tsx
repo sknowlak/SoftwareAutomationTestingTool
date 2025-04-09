@@ -382,6 +382,9 @@ const PostmanStyleRequestEditor: React.FC<{
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [curlInputValue, setCurlInputValue] = useState('');
   const [showCurlInput, setShowCurlInput] = useState(false);
+  const [useCorsMode, setUseCorsMode] = useState(false);
+  const [followRedirects, setFollowRedirects] = useState(true);
+  const [verifySsl, setVerifySsl] = useState(true);
   const curlInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize browser tabs with the current request
@@ -537,7 +540,16 @@ const PostmanStyleRequestEditor: React.FC<{
 
   // Handle run button click
   const handleRun = () => {
-    onRun(editedRequest);
+    // Update request with current settings
+    const requestWithSettings = {
+      ...editedRequest,
+      settings: {
+        useCorsMode,
+        followRedirects,
+        verifySsl
+      }
+    };
+    onRun(requestWithSettings);
   };
 
   // Handle copy cURL command
@@ -899,17 +911,32 @@ const PostmanStyleRequestEditor: React.FC<{
               Request Settings
             </Typography>
             <FormControlLabel
-              control={<Switch defaultChecked />}
+              control={
+                <Switch
+                  checked={followRedirects}
+                  onChange={(e) => setFollowRedirects(e.target.checked)}
+                />
+              }
               label="Follow redirects"
               disabled={disabled || loading}
             />
             <FormControlLabel
-              control={<Switch defaultChecked />}
+              control={
+                <Switch
+                  checked={verifySsl}
+                  onChange={(e) => setVerifySsl(e.target.checked)}
+                />
+              }
               label="Enable SSL certificate verification"
               disabled={disabled || loading}
             />
             <FormControlLabel
-              control={<Switch />}
+              control={
+                <Switch
+                  checked={useCorsMode}
+                  onChange={(e) => setUseCorsMode(e.target.checked)}
+                />
+              }
               label="Use CORS mode (for cross-origin requests)"
               disabled={disabled || loading}
             />

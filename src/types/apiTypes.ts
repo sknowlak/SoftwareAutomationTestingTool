@@ -16,6 +16,12 @@ export interface ApiTest {
   enabled?: boolean;
 }
 
+export interface RequestSettings {
+  useCorsMode?: boolean;
+  followRedirects?: boolean;
+  verifySsl?: boolean;
+}
+
 export interface ApiRequest {
   id: string;
   name: string;
@@ -29,6 +35,7 @@ export interface ApiRequest {
   preRequestScript?: string;
   postResponseScript?: string;
   folderId?: string;
+  settings?: RequestSettings;
 }
 
 export interface ApiResponse {

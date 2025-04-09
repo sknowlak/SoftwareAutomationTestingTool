@@ -648,16 +648,18 @@ const ApiWorkspace: React.FC = () => {
       });
 
       try {
-        // Make the actual API call
+        // Make the actual API call with settings
         const fetchOptions: RequestInit = {
           method: request.method,
           headers,
           // Add body for non-GET requests
           ...(request.method !== 'GET' && processedBody ? { body: processedBody } : {}),
-          // Use no-cors mode to avoid CORS issues in development
-          // In production, this should be handled by proper CORS headers on the server
-          mode: 'no-cors',
-          credentials: 'omit' // Don't send cookies by default for security
+          // Use CORS mode based on settings
+          mode: request.settings?.useCorsMode ? 'cors' : 'no-cors',
+          // Handle credentials based on settings
+          credentials: request.settings?.useCorsMode ? 'include' : 'omit',
+          // Handle redirects based on settings
+          redirect: request.settings?.followRedirects ? 'follow' : 'manual'
         };
 
         console.log('Making API request:', { url, options: fetchOptions });
