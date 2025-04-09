@@ -43,7 +43,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import OpenInBrowserIcon from '@mui/icons-material/OpenInBrowser';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import { ApiRequest, KeyValuePair, ApiResponse } from '../../types/apiTypes';
-import { parseCurlCommand, convertToCurl } from '../../utils/improvedCurlParser';
+import { parseCurlCommand, convertToCurl } from '../../utils/fixedCurlParser';
 
 // Styled components for Postman-like UI
 const RequestContainer = styled(Box)(({ theme }) => ({
