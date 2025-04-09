@@ -149,31 +149,41 @@
             const startTime = performance.now();
 
             try {
-                // Try direct API call first
-                await makeApiCall(method, url, headers, body, startTime);
+                // Try direct API call first with no-cors mode
+                try {
+                    await makeApiCall(method, url, headers, body, startTime, 'no-cors');
+                } catch (noCorsError) {
+                    console.error('no-cors mode failed:', noCorsError);
+
+                    // If no-cors fails, try with cors mode
+                    document.getElementById('response-status').textContent = 'Trying with CORS mode...';
+                    await makeApiCall(method, url, headers, body, startTime, 'cors');
+                }
             } catch (error) {
-                console.error('Direct API call failed:', error);
-                
+                console.error('Direct API call failed with both modes:', error);
+
                 try {
                     // If direct call fails, try a fallback to a reliable public API
                     document.getElementById('response-status').textContent = 'Direct API call failed. Trying fallback...';
                     const fallbackUrl = 'https://jsonplaceholder.typicode.com/posts/1';
-                    await makeApiCall('GET', fallbackUrl, {}, null, startTime);
+                    await makeApiCall('GET', fallbackUrl, {}, null, startTime, 'cors');
                 } catch (fallbackError) {
                     console.error('Fallback API call failed:', fallbackError);
-                    
+
                     // If even the fallback fails, show a mock response
-                    showMockResponse(startTime);
+                    showMockResponse(startTime, url, method, headers, body);
                 }
             }
         });
 
-        async function makeApiCall(method, url, headers, body, startTime) {
+        async function makeApiCall(method, url, headers, body, startTime, mode = 'cors') {
             const options = {
                 method,
                 headers,
-                mode: 'cors',
-                cache: 'no-cache'
+                mode: mode,
+                cache: 'no-cache',
+                // Add timeout
+                signal: AbortSignal.timeout(10000) // 10 second timeout
             };
 
             if (body && method !== 'GET') {
@@ -193,7 +203,7 @@
             // Get response body
             let responseBody = '';
             const contentType = response.headers.get('content-type');
-            
+
             if (contentType && contentType.includes('application/json')) {
                 try {
                     const jsonBody = await response.json();
@@ -212,17 +222,17 @@
             const statusElement = document.getElementById('response-status');
             statusElement.textContent = `Status: ${response.status} ${response.statusText}`;
             statusElement.className = response.ok ? 'status success' : 'status error';
-            
+
             document.getElementById('response-time').textContent = `Time: ${responseTime}ms`;
             document.getElementById('response-size').textContent = `Size: ${formatBytes(size)}`;
             document.getElementById('response-headers').textContent = JSON.stringify(responseHeaders, null, 2);
             document.getElementById('response-body').textContent = responseBody;
         }
 
-        function showMockResponse(startTime) {
+        function showMockResponse(startTime, url = '', method = 'GET', headers = {}, body = '') {
             const endTime = performance.now();
             const responseTime = Math.round(endTime - startTime);
-            
+
             const mockResponse = {
                 status: 200,
                 statusText: 'OK (Mock Response)',
@@ -233,18 +243,37 @@
                 },
                 body: {
                     message: 'This is a mock response because the API call failed',
-                    note: 'In a real application, this would be actual data from the API',
+                    error_info: {
+                        possible_causes: [
+                            '503 Service Unavailable error from the server',
+                            'CORS policy blocking the request',
+                            'Network connectivity issues',
+                            'Server timeout'
+                        ],
+                        solutions: [
+                            'Try again later',
+                            'Use a server-side proxy to avoid CORS issues',
+                            'Check your network connection',
+                            'Increase the request timeout'
+                        ]
+                    },
+                    request_details: {
+                        url: url,
+                        method: method,
+                        headers: headers,
+                        body: body
+                    },
                     timestamp: new Date().toISOString()
                 }
             };
-            
+
             const responseBody = JSON.stringify(mockResponse.body, null, 2);
             const size = new Blob([responseBody]).size;
-            
+
             const statusElement = document.getElementById('response-status');
             statusElement.textContent = `Status: ${mockResponse.status} ${mockResponse.statusText}`;
             statusElement.className = 'status success';
-            
+
             document.getElementById('response-time').textContent = `Time: ${responseTime}ms`;
             document.getElementById('response-size').textContent = `Size: ${formatBytes(size)}`;
             document.getElementById('response-headers').textContent = JSON.stringify(mockResponse.headers, null, 2);
@@ -253,11 +282,11 @@
 
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
-            
+
             const k = 1024;
             const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            
+
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
     </script>
