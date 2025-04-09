@@ -667,13 +667,13 @@ const PostmanStyleRequestEditor: React.FC<{
         <TextField
           fullWidth
           size="small"
-          placeholder="https://api.example.com/users/profile"
+          placeholder="Enter request URL"
           value={editedRequest.url}
           onChange={(e) => handleRequestChange('url', e.target.value)}
           disabled={disabled || loading}
           sx={{ mr: 1 }}
           InputProps={{
-            sx: { height: '40px' }
+            sx: { height: '40px', fontFamily: 'monospace' }
           }}
         />
 
@@ -926,12 +926,25 @@ const PostmanStyleRequestEditor: React.FC<{
 
       {/* Response Section */}
       <ResponseContainer>
-        <ResponseHeader>
+        <ResponseHeader
+          sx={{
+            bgcolor: response ? (response.status >= 200 && response.status < 300 ? 'success.light' : 'error.light') : 'background.default',
+            transition: 'background-color 0.3s ease',
+            cursor: 'pointer',
+            '&:hover': {
+              bgcolor: response ? (response.status >= 200 && response.status < 300 ? 'success.main' : 'error.main') : 'background.default',
+              '& .MuiTypography-root': {
+                color: 'white'
+              }
+            }
+          }}
+          onClick={() => setResponseExpanded(!responseExpanded)}
+        >
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mr: 1 }}>
               Response
             </Typography>
-            <IconButton size="small" onClick={() => setResponseExpanded(!responseExpanded)}>
+            <IconButton size="small">
               {responseExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
           </Box>
@@ -943,10 +956,14 @@ const PostmanStyleRequestEditor: React.FC<{
                 sx={{
                   fontWeight: 'bold',
                   color: getStatusColor(response.status),
-                  mr: 2
+                  mr: 2,
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: 'rgba(255, 255, 255, 0.2)'
                 }}
               >
-                Status: {response.status} {response.statusText}
+                {response.status} {response.statusText}
               </Typography>
 
               <Typography variant="body2" sx={{ mr: 2 }}>
@@ -966,20 +983,46 @@ const PostmanStyleRequestEditor: React.FC<{
               <CircularProgress />
             </Box>
           ) : response ? (
-            <Box>
-              <Tabs value={0} variant="scrollable" scrollButtons="auto">
+            <Box sx={{ border: 1, borderTop: 0, borderColor: 'divider', bgcolor: 'background.paper' }}>
+              <Tabs
+                value={0}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  '& .MuiTab-root': {
+                    minWidth: 120,
+                    fontWeight: 'medium'
+                  }
+                }}
+              >
                 <Tab label="Body" />
                 <Tab label="Headers" />
                 <Tab label="Cookies" />
                 <Tab label="Test Results" />
               </Tabs>
 
-              <ResponseBody>
+              <ResponseBody sx={{
+                maxHeight: '400px',
+                overflow: 'auto',
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                  height: '8px'
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '4px'
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: 'rgba(0,0,0,0.05)'
+                }
+              }}>
                 {formatResponseBody(response.body, response.headers['content-type'] || '')}
               </ResponseBody>
             </Box>
           ) : (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4, border: 1, borderTop: 0, borderColor: 'divider' }}>
               <Typography variant="body2" color="text.secondary">
                 Send a request to see the response
               </Typography>
