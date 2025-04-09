@@ -52,6 +52,7 @@ import CollectionsIcon from '@mui/icons-material/Collections';
 import ImportDialog from './ImportDialog';
 import RequestEditorComponent from './RequestEditor';
 import PostmanStyleRequestEditor from './PostmanStyleRequestEditor';
+import { sendApiRequest, parseCurlCommand, checkApiProxyServer } from '../../services/apiProxyService';
 
 import {
   ApiCollection,
@@ -504,6 +505,10 @@ const ApiWorkspace: React.FC = () => {
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>('');
   const [response, setResponse] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Check if API proxy server is running
+  const [isProxyServerRunning, setIsProxyServerRunning] = useState<boolean>(false);
 
   // New state variables for additional features
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -515,6 +520,21 @@ const ApiWorkspace: React.FC = () => {
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // Check if API proxy server is running
+  useEffect(() => {
+    const checkProxyServer = async () => {
+      const isRunning = await checkApiProxyServer();
+      setIsProxyServerRunning(isRunning);
+      if (!isRunning) {
+        console.warn('API proxy server is not running. Some features may not work correctly.');
+      } else {
+        console.log('API proxy server is running.');
+      }
+    };
+
+    checkProxyServer();
+  }, []);
 
   // Load collections and environments
   useEffect(() => {
