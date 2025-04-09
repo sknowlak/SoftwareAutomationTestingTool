@@ -13,7 +13,7 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { parseCurlCommand } from '../../utils/curlParser';
+import { parseCurlCommand } from '../../utils/improvedCurlParser';
 import { parseSwaggerSpec } from '../../utils/swaggerParser';
 import { ApiRequest, ApiCollection } from '../../types/apiTypes';
 

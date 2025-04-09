@@ -42,9 +42,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import OpenInBrowserIcon from '@mui/icons-material/OpenInBrowser';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
-import { parseCurlCommand } from '../../utils/curlParser';
 import { ApiRequest, KeyValuePair, ApiResponse } from '../../types/apiTypes';
-import { convertToCurl } from '../../utils/curlParser';
+import { parseCurlCommand, convertToCurl } from '../../utils/improvedCurlParser';
 
 // Styled components for Postman-like UI
 const RequestContainer = styled(Box)(({ theme }) => ({
