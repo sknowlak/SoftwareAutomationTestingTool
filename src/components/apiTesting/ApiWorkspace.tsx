@@ -1100,6 +1100,7 @@ const ApiWorkspace: React.FC = () => {
                 response={response}
                 loading={loading}
                 disabled={loading}
+                onImportCurl={() => setImportDialogOpen(true)}
               />
             ) : (
               <Box sx={{ p: 3, textAlign: 'center' }}>

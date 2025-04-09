@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -38,6 +38,11 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CloseIcon from '@mui/icons-material/Close';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import OpenInBrowserIcon from '@mui/icons-material/OpenInBrowser';
+import ImportExportIcon from '@mui/icons-material/ImportExport';
+import { parseCurlCommand } from '../../utils/curlParser';
 import { ApiRequest, KeyValuePair, ApiResponse } from '../../types/apiTypes';
 import { convertToCurl } from '../../utils/curlParser';
 
@@ -99,6 +104,59 @@ const ResponseBody = styled(Box)(({ theme }) => ({
   wordBreak: 'break-word'
 }));
 
+// Browser tab styled components
+const BrowserTabsContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  backgroundColor: theme.palette.background.default,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  overflowX: 'auto',
+  '&::-webkit-scrollbar': {
+    height: '4px'
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: theme.palette.divider
+  }
+}));
+
+const BrowserTab = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'active'
+})<{ active?: boolean }>(({ theme, active }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  padding: theme.spacing(1, 2),
+  minWidth: '150px',
+  maxWidth: '200px',
+  height: '36px',
+  backgroundColor: active ? theme.palette.background.paper : theme.palette.background.default,
+  borderRight: `1px solid ${theme.palette.divider}`,
+  borderTop: active ? `2px solid ${theme.palette.primary.main}` : 'none',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  transition: 'background-color 0.2s ease',
+  '&:hover': {
+    backgroundColor: active ? theme.palette.background.paper : theme.palette.action.hover
+  }
+}));
+
+const TabActions = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  marginLeft: 'auto',
+  '& > *': {
+    marginLeft: theme.spacing(0.5)
+  }
+}));
+
+const NewTabButton = styled(IconButton)(({ theme }) => ({
+  minWidth: '36px',
+  height: '36px',
+  borderRadius: 0,
+  padding: theme.spacing(0.5)
+}));
+
 // Component for key-value pair editor with description (headers, params, etc.)
 const KeyValueEditor: React.FC<{
   pairs: KeyValuePair[];
@@ -119,7 +177,7 @@ const KeyValueEditor: React.FC<{
   const handlePairChange = (index: number, field: 'key' | 'value' | 'description', value: string) => {
     const newPairs = [...pairs];
     if (!newPairs[index]) return;
-    
+
     if (field === 'key') {
       newPairs[index].key = value;
     } else if (field === 'value') {
@@ -127,14 +185,14 @@ const KeyValueEditor: React.FC<{
     } else if (field === 'description') {
       newPairs[index].description = value;
     }
-    
+
     onChange(newPairs);
   };
 
   const handleTogglePair = (index: number) => {
     const newPairs = [...pairs];
     if (!newPairs[index]) return;
-    
+
     newPairs[index].enabled = !newPairs[index].enabled;
     onChange(newPairs);
   };
@@ -153,11 +211,11 @@ const KeyValueEditor: React.FC<{
       return suggestion || 'Parameter name';
     }
   };
-  
+
   const getValuePlaceholder = (key: string) => {
     // Provide helpful placeholders based on key
     const lowerKey = key.toLowerCase();
-    
+
     if (type === 'headers') {
       if (lowerKey === 'content-type') return 'application/json';
       if (lowerKey === 'authorization') return 'Bearer token';
@@ -173,99 +231,100 @@ const KeyValueEditor: React.FC<{
     }
   };
 
+  // Responsive design - use grid on small screens, table on larger screens
   return (
-    <TableContainer component={Paper} elevation={0} variant="outlined">
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell padding="checkbox" width="40px">
-              <Typography variant="subtitle2">Enabled</Typography>
-            </TableCell>
-            <TableCell width="30%">
-              <Typography variant="subtitle2">Key</Typography>
-            </TableCell>
-            <TableCell width="30%">
-              <Typography variant="subtitle2">Value</Typography>
-            </TableCell>
-            <TableCell width="30%">
-              <Typography variant="subtitle2">Description</Typography>
-            </TableCell>
-            <TableCell padding="checkbox" width="40px">
-              <Typography variant="subtitle2">Actions</Typography>
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {pairs.map((pair, index) => (
-            <TableRow key={index}>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  checked={pair.enabled !== false}
-                  onChange={() => handleTogglePair(index)}
-                  disabled={disabled}
-                  size="small"
-                />
-              </TableCell>
-              <TableCell>
-                <TextField
-                  fullWidth
-                  size="small"
-                  variant="outlined"
-                  placeholder={getKeyPlaceholder(index)}
-                  value={pair.key}
-                  onChange={(e) => handlePairChange(index, 'key', e.target.value)}
-                  disabled={disabled}
-                />
-              </TableCell>
-              <TableCell>
-                <TextField
-                  fullWidth
-                  size="small"
-                  variant="outlined"
-                  placeholder={getValuePlaceholder(pair.key)}
-                  value={pair.value}
-                  onChange={(e) => handlePairChange(index, 'value', e.target.value)}
-                  disabled={disabled}
-                />
-              </TableCell>
-              <TableCell>
-                <TextField
-                  fullWidth
-                  size="small"
-                  variant="outlined"
-                  placeholder="Description (optional)"
-                  value={pair.description || ''}
-                  onChange={(e) => handlePairChange(index, 'description', e.target.value)}
-                  disabled={disabled}
-                />
-              </TableCell>
-              <TableCell padding="checkbox">
-                <IconButton
-                  size="small"
-                  onClick={() => handleRemovePair(index)}
-                  disabled={disabled}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </TableCell>
-            </TableRow>
-          ))}
-          <TableRow>
-            <TableCell colSpan={5} align="left">
-              <Button
-                startIcon={<AddIcon />}
-                onClick={handleAddPair}
+    <Box>
+      {/* Table header */}
+      <Grid container spacing={1} sx={{ mb: 1, px: 1 }}>
+        <Grid item xs={1}>
+          <Typography variant="subtitle2" sx={{ fontSize: '0.75rem' }}>Enabled</Typography>
+        </Grid>
+        <Grid item xs={3}>
+          <Typography variant="subtitle2" sx={{ fontSize: '0.75rem' }}>Key</Typography>
+        </Grid>
+        <Grid item xs={3}>
+          <Typography variant="subtitle2" sx={{ fontSize: '0.75rem' }}>Value</Typography>
+        </Grid>
+        <Grid item xs={4}>
+          <Typography variant="subtitle2" sx={{ fontSize: '0.75rem' }}>Description</Typography>
+        </Grid>
+        <Grid item xs={1}>
+          <Typography variant="subtitle2" sx={{ fontSize: '0.75rem' }}>Actions</Typography>
+        </Grid>
+      </Grid>
+
+      {/* Table body */}
+      <Box sx={{ maxHeight: '300px', overflow: 'auto' }}>
+        {pairs.map((pair, index) => (
+          <Grid container spacing={1} key={index} sx={{ mb: 1, px: 1, alignItems: 'center' }}>
+            <Grid item xs={1} sx={{ textAlign: 'center' }}>
+              <Checkbox
+                checked={pair.enabled !== false}
+                onChange={() => handleTogglePair(index)}
                 disabled={disabled}
                 size="small"
-                sx={{ mt: 1 }}
+              />
+            </Grid>
+            <Grid item xs={3}>
+              <TextField
+                fullWidth
+                size="small"
+                variant="outlined"
+                placeholder={getKeyPlaceholder(index)}
+                value={pair.key}
+                onChange={(e) => handlePairChange(index, 'key', e.target.value)}
+                disabled={disabled}
+              />
+            </Grid>
+            <Grid item xs={3}>
+              <TextField
+                fullWidth
+                size="small"
+                variant="outlined"
+                placeholder={getValuePlaceholder(pair.key)}
+                value={pair.value}
+                onChange={(e) => handlePairChange(index, 'value', e.target.value)}
+                disabled={disabled}
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                fullWidth
+                size="small"
+                variant="outlined"
+                placeholder="Description (optional)"
+                value={pair.description || ''}
+                onChange={(e) => handlePairChange(index, 'description', e.target.value)}
+                disabled={disabled}
+              />
+            </Grid>
+            <Grid item xs={1} sx={{ textAlign: 'center' }}>
+              <IconButton
+                size="small"
+                onClick={() => handleRemovePair(index)}
+                disabled={disabled}
               >
-                Add {type === 'headers' ? 'Header' : 'Parameter'}
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </TableContainer>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Grid>
+          </Grid>
+        ))}
+      </Box>
+
+      {/* Add button */}
+      <Box sx={{ mt: 1, px: 1 }}>
+        <Button
+          startIcon={<AddIcon />}
+          onClick={handleAddPair}
+          disabled={disabled}
+          size="small"
+          variant="outlined"
+          color="primary"
+        >
+          Add {type === 'headers' ? 'Header' : 'Parameter'}
+        </Button>
+      </Box>
+    </Box>
   );
 };
 
@@ -273,7 +332,7 @@ const KeyValueEditor: React.FC<{
 const getBodyPlaceholder = (headers: KeyValuePair[]): string => {
   const contentTypeHeader = headers.find(h => h.key.toLowerCase() === 'content-type');
   const contentType = contentTypeHeader?.value || 'application/json';
-  
+
   if (contentType.includes('json')) {
     return `{
   "name": "John Doe",
@@ -297,6 +356,14 @@ const getBodyPlaceholder = (headers: KeyValuePair[]): string => {
   }
 };
 
+// Interface for browser tab
+interface BrowserTabItem {
+  id: string;
+  name: string;
+  request: ApiRequest;
+  active: boolean;
+}
+
 // Component for request editor
 const PostmanStyleRequestEditor: React.FC<{
   request: ApiRequest;
@@ -305,22 +372,159 @@ const PostmanStyleRequestEditor: React.FC<{
   response: ApiResponse | null;
   loading: boolean;
   disabled?: boolean;
-}> = ({ request, onSave, onRun, response, loading, disabled = false }) => {
+  onImportCurl?: () => void;
+}> = ({ request, onSave, onRun, response, loading, disabled = false, onImportCurl }) => {
   const [editedRequest, setEditedRequest] = useState<ApiRequest>(request);
   const [activeTab, setActiveTab] = useState(0);
   const [curlCommand, setCurlCommand] = useState('');
   const [curlCopied, setCurlCopied] = useState(false);
   const [responseExpanded, setResponseExpanded] = useState(true);
+  const [browserTabs, setBrowserTabs] = useState<BrowserTabItem[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>('');
+  const [curlInputValue, setCurlInputValue] = useState('');
+  const [showCurlInput, setShowCurlInput] = useState(false);
+  const curlInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize browser tabs with the current request
+  useEffect(() => {
+    if (!browserTabs.length) {
+      const newTab: BrowserTabItem = {
+        id: `tab-${Date.now()}`,
+        name: request.name || 'New Request',
+        request: { ...request },
+        active: true
+      };
+      setBrowserTabs([newTab]);
+      setActiveTabId(newTab.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update edited request when the request prop changes
   useEffect(() => {
     setEditedRequest(request);
-  }, [request]);
+
+    // Update the active tab with the new request
+    if (activeTabId) {
+      setBrowserTabs(prev => prev.map(tab =>
+        tab.id === activeTabId ? { ...tab, request: { ...request } } : tab
+      ));
+    }
+  }, [request, activeTabId]);
 
   // Update cURL command when edited request changes
   useEffect(() => {
     setCurlCommand(convertToCurl(editedRequest));
   }, [editedRequest]);
+
+  // Handle adding a new browser tab
+  const handleAddTab = () => {
+    const newTab: BrowserTabItem = {
+      id: `tab-${Date.now()}`,
+      name: 'New Request',
+      request: {
+        id: `req-${Date.now()}`,
+        name: 'New Request',
+        url: '',
+        method: 'GET',
+        headers: [],
+        params: [],
+        body: '',
+        tests: []
+      },
+      active: true
+    };
+
+    // Deactivate all other tabs
+    const updatedTabs = browserTabs.map(tab => ({ ...tab, active: false }));
+    setBrowserTabs([...updatedTabs, newTab]);
+    setActiveTabId(newTab.id);
+    setEditedRequest(newTab.request);
+  };
+
+  // Handle closing a browser tab
+  const handleCloseTab = (tabId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    // Don't allow closing the last tab
+    if (browserTabs.length <= 1) return;
+
+    const tabIndex = browserTabs.findIndex(tab => tab.id === tabId);
+    const isActiveTab = browserTabs[tabIndex].active;
+
+    // Remove the tab
+    const newTabs = browserTabs.filter(tab => tab.id !== tabId);
+
+    // If we closed the active tab, activate another one
+    if (isActiveTab) {
+      const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
+      newTabs[newActiveIndex].active = true;
+      setActiveTabId(newTabs[newActiveIndex].id);
+      setEditedRequest(newTabs[newActiveIndex].request);
+    }
+
+    setBrowserTabs(newTabs);
+  };
+
+  // Handle selecting a browser tab
+  const handleSelectTab = (tabId: string) => {
+    // Save current request to current tab
+    const updatedTabs = browserTabs.map(tab => ({
+      ...tab,
+      request: tab.id === activeTabId ? editedRequest : tab.request,
+      active: tab.id === tabId
+    }));
+
+    setBrowserTabs(updatedTabs);
+    setActiveTabId(tabId);
+
+    // Load the selected tab's request
+    const selectedTab = updatedTabs.find(tab => tab.id === tabId);
+    if (selectedTab) {
+      setEditedRequest(selectedTab.request);
+    }
+  };
+
+  // Handle importing cURL
+  const handleImportCurl = () => {
+    if (!curlInputValue.trim()) return;
+
+    try {
+      const parsedRequest = parseCurlCommand(curlInputValue);
+      if (parsedRequest) {
+        // Create a new tab with the imported request
+        const newTab: BrowserTabItem = {
+          id: `tab-${Date.now()}`,
+          name: parsedRequest.name || 'Imported Request',
+          request: parsedRequest,
+          active: true
+        };
+
+        // Deactivate all other tabs
+        const updatedTabs = browserTabs.map(tab => ({ ...tab, active: false }));
+        setBrowserTabs([...updatedTabs, newTab]);
+        setActiveTabId(newTab.id);
+        setEditedRequest(parsedRequest);
+
+        // Clear and hide the input
+        setCurlInputValue('');
+        setShowCurlInput(false);
+      }
+    } catch (error) {
+      console.error('Error parsing cURL:', error);
+    }
+  };
+
+  // Toggle cURL input visibility
+  const toggleCurlInput = () => {
+    setShowCurlInput(!showCurlInput);
+    // Focus the input when shown
+    if (!showCurlInput) {
+      setTimeout(() => {
+        curlInputRef.current?.focus();
+      }, 100);
+    }
+  };
 
   // Handle request field changes
   const handleRequestChange = (field: keyof ApiRequest, value: any) => {
@@ -381,6 +585,67 @@ const PostmanStyleRequestEditor: React.FC<{
 
   return (
     <RequestContainer>
+      {/* Browser Tabs */}
+      <BrowserTabsContainer>
+        {browserTabs.map((tab) => (
+          <BrowserTab
+            key={tab.id}
+            active={tab.active}
+            onClick={() => handleSelectTab(tab.id)}
+          >
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{ flex: 1, fontWeight: tab.active ? 'bold' : 'normal' }}
+            >
+              {tab.name}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={(e) => handleCloseTab(tab.id, e)}
+              sx={{ ml: 1, p: 0.5 }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </BrowserTab>
+        ))}
+        <NewTabButton onClick={handleAddTab}>
+          <AddCircleOutlineIcon fontSize="small" />
+        </NewTabButton>
+        <NewTabButton onClick={toggleCurlInput}>
+          <ImportExportIcon fontSize="small" />
+        </NewTabButton>
+        {onImportCurl && (
+          <NewTabButton onClick={onImportCurl}>
+            <OpenInBrowserIcon fontSize="small" />
+          </NewTabButton>
+        )}
+      </BrowserTabsContainer>
+
+      {/* cURL Input */}
+      {showCurlInput && (
+        <Box sx={{ display: 'flex', p: 1, borderBottom: 1, borderColor: 'divider' }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Paste cURL command here"
+            value={curlInputValue}
+            onChange={(e) => setCurlInputValue(e.target.value)}
+            inputRef={curlInputRef}
+            sx={{ mr: 1 }}
+            InputProps={{
+              sx: { fontFamily: 'monospace', fontSize: '0.875rem' }
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={handleImportCurl}
+            disabled={!curlInputValue.trim()}
+          >
+            Import
+          </Button>
+        </Box>
+      )}
       {/* URL Bar */}
       <UrlBar>
         <FormControl size="small" sx={{ width: 120, mr: 1 }}>
@@ -399,7 +664,7 @@ const PostmanStyleRequestEditor: React.FC<{
             <MenuItem value="OPTIONS">OPTIONS</MenuItem>
           </Select>
         </FormControl>
-        
+
         <TextField
           fullWidth
           size="small"
@@ -412,17 +677,17 @@ const PostmanStyleRequestEditor: React.FC<{
             sx: { height: '40px' }
           }}
         />
-        
+
         <Tooltip title="Save">
-          <IconButton 
-            onClick={handleSave} 
+          <IconButton
+            onClick={handleSave}
             disabled={disabled || loading}
             sx={{ mr: 1 }}
           >
             <SaveIcon />
           </IconButton>
         </Tooltip>
-        
+
         <SendButton
           variant="contained"
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
@@ -488,7 +753,7 @@ const PostmanStyleRequestEditor: React.FC<{
                 <MenuItem value="apikey">API Key</MenuItem>
               </Select>
             </FormControl>
-            
+
             <TextField
               fullWidth
               label="Token"
@@ -496,7 +761,7 @@ const PostmanStyleRequestEditor: React.FC<{
               disabled={disabled || loading}
               sx={{ mb: 2 }}
             />
-            
+
             <Typography variant="caption" color="text.secondary">
               This authorization will be automatically added to the request headers.
             </Typography>
@@ -531,13 +796,13 @@ const PostmanStyleRequestEditor: React.FC<{
                     // Update or add Content-Type header
                     const headerIndex = editedRequest.headers.findIndex(h => h.key.toLowerCase() === 'content-type');
                     const newHeaders = [...editedRequest.headers];
-                    
+
                     if (headerIndex >= 0) {
                       newHeaders[headerIndex].value = e.target.value as string;
                     } else {
                       newHeaders.push({ key: 'Content-Type', value: e.target.value as string, enabled: true });
                     }
-                    
+
                     handleRequestChange('headers', newHeaders);
                   }}
                   disabled={disabled || loading}
@@ -549,7 +814,7 @@ const PostmanStyleRequestEditor: React.FC<{
                   <MenuItem value="application/xml">XML</MenuItem>
                 </Select>
               </FormControl>
-              
+
               <TextField
                 fullWidth
                 multiline
@@ -671,31 +936,31 @@ const PostmanStyleRequestEditor: React.FC<{
               {responseExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
           </Box>
-          
+
           {response && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  fontWeight: 'bold', 
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 'bold',
                   color: getStatusColor(response.status),
                   mr: 2
                 }}
               >
                 Status: {response.status} {response.statusText}
               </Typography>
-              
+
               <Typography variant="body2" sx={{ mr: 2 }}>
                 Time: {formatResponseTime(response.time)}
               </Typography>
-              
+
               <Typography variant="body2">
                 Size: {formatResponseSize(response.size)}
               </Typography>
             </Box>
           )}
         </ResponseHeader>
-        
+
         <Collapse in={responseExpanded}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
@@ -709,7 +974,7 @@ const PostmanStyleRequestEditor: React.FC<{
                 <Tab label="Cookies" />
                 <Tab label="Test Results" />
               </Tabs>
-              
+
               <ResponseBody>
                 {formatResponseBody(response.body, response.headers['content-type'] || '')}
               </ResponseBody>
