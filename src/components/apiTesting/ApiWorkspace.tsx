@@ -51,6 +51,7 @@ import PublicIcon from '@mui/icons-material/Public';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import ImportDialog from './ImportDialog';
 import RequestEditorComponent from './RequestEditor';
+import PostmanStyleRequestEditor from './PostmanStyleRequestEditor';
 
 import {
   ApiCollection,
@@ -624,13 +625,13 @@ const ApiWorkspace: React.FC = () => {
 
       // Generate mock response
       const mockResponse: ApiResponse = {
-        statusCode: 200,
+        status: 200,
         statusText: 'OK',
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Server', value: 'Betaboss Mock Server' },
-          { key: 'Date', value: new Date().toUTCString() }
-        ],
+        headers: {
+          'content-type': 'application/json',
+          'server': 'Betaboss Mock Server',
+          'date': new Date().toUTCString()
+        },
         body: JSON.stringify({ message: 'Success', data: { id: '123', name: 'Test' } }, null, 2),
         time: Math.floor(Math.random() * 500) + 100,
         size: Math.floor(Math.random() * 1000) + 500,
@@ -1092,11 +1093,12 @@ const ApiWorkspace: React.FC = () => {
             </Box>
 
             {selectedRequest ? (
-              <RequestEditorComponent
+              <PostmanStyleRequestEditor
                 request={selectedRequest}
                 onSave={handleRequestSave}
                 onRun={handleRequestRun}
-                onImportCurl={() => setImportDialogOpen(true)}
+                response={response}
+                loading={loading}
                 disabled={loading}
               />
             ) : (

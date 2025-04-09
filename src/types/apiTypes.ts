@@ -32,9 +32,9 @@ export interface ApiRequest {
 }
 
 export interface ApiResponse {
-  statusCode: number;
+  status: number;
   statusText: string;
-  headers: KeyValuePair[];
+  headers: Record<string, string>;
   body: string;
   time: number;
   size: number;
