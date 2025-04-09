@@ -899,15 +899,25 @@ const PostmanStyleRequestEditor: React.FC<{
               Request Settings
             </Typography>
             <FormControlLabel
-              control={<Switch />}
+              control={<Switch defaultChecked />}
               label="Follow redirects"
               disabled={disabled || loading}
             />
             <FormControlLabel
-              control={<Switch />}
+              control={<Switch defaultChecked />}
               label="Enable SSL certificate verification"
               disabled={disabled || loading}
             />
+            <FormControlLabel
+              control={<Switch />}
+              label="Use CORS mode (for cross-origin requests)"
+              disabled={disabled || loading}
+            />
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                If you're experiencing CORS issues, try disabling CORS mode. This may help with testing but won't work for all APIs.
+              </Typography>
+            </Box>
           </TabPanel>
         )}
 

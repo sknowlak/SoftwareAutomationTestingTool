@@ -654,9 +654,10 @@ const ApiWorkspace: React.FC = () => {
           headers,
           // Add body for non-GET requests
           ...(request.method !== 'GET' && processedBody ? { body: processedBody } : {}),
-          // Add CORS mode
-          mode: 'cors',
-          credentials: 'include'
+          // Use no-cors mode to avoid CORS issues in development
+          // In production, this should be handled by proper CORS headers on the server
+          mode: 'no-cors',
+          credentials: 'omit' // Don't send cookies by default for security
         };
 
         console.log('Making API request:', { url, options: fetchOptions });
